@@ -29,10 +29,15 @@
  - Run a test: `sqlite3 -csv -header money_diary.db < tests/<test-name>.sql > tests/out/<test-name>.csv && diff -u tests/expected/<test-name>.csv tests/out/<test-name>.csv`
  - Aim for coverage of views (e.g., price vs. FX attribution), foreign keys, and NOT NULL constraints.
 
- ## Commit & Pull Request Guidelines
- - Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
- - One logical change per commit; include schema and view updates together with minimal seed data for reproduction.
- - PRs include: purpose, schema diffs, example queries/outputs, and any migration steps. Link issues if applicable; add screenshots for visualization changes.
+## Commit & Pull Request Guidelines
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
+- One logical change per commit; include schema and view updates together with minimal seed data for reproduction.
+- PRs include: purpose, schema diffs, example queries/outputs, and any migration steps. Link issues if applicable; add screenshots for visualization changes.
+
+## PR 記述スタイル（日本語）
+- 見出し構成: `概要`, `変更点`, `背景/目的`, `使い方/確認方法`, `関連Issue`, `チェックリスト`。
+- 箇条書きは簡潔に、コマンドはコードブロックで示す。
+- ひな型: `.github/PULL_REQUEST_TEMPLATE.md`（自動適用）。
 
  ## Security & Configuration Tips
  - Keep personal data local. Do not commit `money_diary.db` or private CSVs; add them to `.gitignore`.
