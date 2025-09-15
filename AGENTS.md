@@ -1,5 +1,7 @@
  # Repository Guidelines
 
+* 可能な限り日本語で会話
+
  ## Project Structure & Module Organization
  - `schema.sql`: SQLite schema for `fx_rates`, `assets`, `snapshots`, `cashflows` and views (e.g., `v_valuation`).
  - `views/`: Reusable view definitions (`.sql`), one file per view.
