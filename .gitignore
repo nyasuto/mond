@@ -1,0 +1,13 @@
+# Local SQLite database
+money_diary.db
+
+# Local data and test outputs
+data/
+tests/out/
+
+# Environment secrets
+.env
+
+# OS cruft
+.DS_Store
+
