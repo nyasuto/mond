@@ -58,9 +58,28 @@ INSERT INTO cashflows (date, ticker, type, amount_ccy, ccy)
   VALUES ('2025-09-15','VTI','DIVIDEND',200,'USD');
 
 
-	6.	ビューで確認
+	6.	評価額ビュー（円換算）
 
 SELECT * FROM v_valuation WHERE date='2025-09-15';
+
+
+	7.	原因分解ビュー（価格/為替/クロス/フロー）
+
+SELECT date, ticker,
+       round(delta_total,3) AS total,
+       round(delta_price,3) AS price,
+       round(delta_fx,3)    AS fx,
+       round(delta_cross,3) AS cross,
+       round(flow,3)        AS flow
+  FROM v_attribution
+ WHERE date='2025-09-15'
+ ORDER BY ticker;  -- 'PORTFOLIO' 行も併記
+
+
+	8.	テスト（開発者向け）
+
+./scripts/test.sh
+  # 例: valuation と attribution のゴールデンテストが PASS します
 
 
 
@@ -84,6 +103,6 @@ SELECT * FROM v_valuation WHERE date='2025-09-15';
 	•	完全に個人利用前提。クラウド共有や公開環境への配置は想定していません。
 	•	為替・株価データは外部 API や CSV インポートにより各自で取得してください。
 	•	個人情報や資産データはローカル保存を推奨します。
+	•	DB ファイル（money_diary.db）や `data/` は .gitignore 済み。Git に含めないでください。
 
 ⸻
-
