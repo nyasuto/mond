@@ -122,6 +122,14 @@ scripts/add_snapshot.sh
 
 ⸻
 
+🛠️ 開発補助（Makefile）
+- `make help`
+- `make venv && make install`
+- `make db-init`
+- `make test`
+- `make quality`
+- `make gui`
+
 **GUI 入力（ローカル）**
 - 事前準備
   - `python3 -m venv .venv && source .venv/bin/activate`
