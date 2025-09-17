@@ -130,6 +130,8 @@ scripts/add_snapshot.sh
 - `make quality`
 - `make gui`
 
+CI: push / PR ごとに GitHub Actions で `make quality` が実行されます。
+
 **GUI 入力（ローカル）**
 - 事前準備
   - `python3 -m venv .venv && source .venv/bin/activate`
