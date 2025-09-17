@@ -11,3 +11,4 @@ tests/out/
 # OS cruft
 .DS_Store
 
+.venv
