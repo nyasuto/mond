@@ -83,6 +83,21 @@ SELECT date, ticker,
 
 
 
+	9.	手動入力（対話式スクリプト）
+
+# 銘柄の追加/更新（assets）
+scripts/add_asset.sh
+
+# 当日レートを手入力（対JPY）
+scripts/add_fx_manual.sh
+
+# スナップショットを手入力（date, ticker, qty, price_ccy）
+scripts/add_snapshot.sh
+
+注: v_attribution は「直近の前回スナップショット」と比較するため、
+月次入力（例: 月末のみの記録）でも差分が計算されます。
+非JPY資産は該当2日付の為替レート行が必要です。
+
 ⸻
 
 📊 将来の拡張
@@ -106,3 +121,14 @@ SELECT date, ticker,
 	•	DB ファイル（money_diary.db）や `data/` は .gitignore 済み。Git に含めないでください。
 
 ⸻
+
+**GUI 入力（ローカル）**
+- 事前準備
+  - `python3 -m venv .venv && source .venv/bin/activate`
+  - `pip install -r requirements.txt`
+- 起動
+  - `streamlit run app/streamlit_app.py`
+- 機能
+  - Assets/Fx/Snapshots のフォーム入力（UPSERT）
+  - 指定日付の `v_valuation` と `v_attribution` を一覧・CSVダウンロード
+  - DB が無ければ初回起動時に `schema.sql` を適用
