@@ -170,15 +170,18 @@ make gui
 CI（GitHub Actions）では push / PR ごとに `make quality` が実行されます。
 
 ### GUI 入力（Streamlit）
-1. 初回セットアップ
+1. 初回セットアップ（uv を利用）
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
+   # uv が未インストールの場合: https://docs.astral.sh/uv/getting-started/ を参照
+   uv python install 3.12
+   uv sync
+   # もしくは make install（uv 実行をラップ）
+   make install
    ```
-2. 起動
+2. 起動（`.venv` を自動利用）
    ```bash
-   streamlit run app/streamlit_app.py
+   make gui
+   # 直接起動したい場合: uv run streamlit run app/streamlit_app.py
    ```
 3. 主な機能
    - Assets / FX / Snapshots のフォーム入力（UPSERT）
@@ -190,7 +193,7 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
 
 ### OpenAI API による要約（任意）
 1. 環境変数 `OPENAI_API_KEY` を設定（例: `.env` に追記して起動前に読み込む）
-2. `pip install -r requirements.txt` で `openai` パッケージを導入
+2. `uv sync` で依存を導入（または `make install`）
 3. Views タブの「AI要約 (OpenAI)」を開き、
    - 「選択日の要因を要約」: 現在表示中の日付の価格/為替/フローを要約
    - 「全履歴を要約」: これまでの履歴から主要変動要因を俯瞰
