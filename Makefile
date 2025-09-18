@@ -16,10 +16,9 @@ help:
 	@echo "  make quality     # Run quality checks (tests, linters)"
 	@echo "  make clean       # Remove virtualenv and DB"
 
-install: requirements.txt
+install: pyproject.toml
 	$(UV) python install 3.12
-	$(UV) venv --python 3.12
-	$(UV) pip install -r requirements.txt
+	$(UV) sync
 
 # Initialize DB once (non-destructive if file exists)
 db-init:

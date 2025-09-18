@@ -1,0 +1,11 @@
+[project]
+name = "mond"
+version = "0.1.0"
+description = "Personal asset and cashflow tracking toolkit"
+requires-python = ">=3.12"
+dependencies = [
+  "streamlit>=1.31",
+  "pandas>=2.0",
+  "ruff>=0.5",
+  "openai>=1.17",
+]

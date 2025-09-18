@@ -174,8 +174,7 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
    ```bash
    # uv が未インストールの場合: https://docs.astral.sh/uv/getting-started/ を参照
    uv python install 3.12
-   uv venv --python 3.12
-   uv pip install -r requirements.txt
+   uv sync
    # もしくは make install（uv 実行をラップ）
    make install
    ```
@@ -194,7 +193,7 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
 
 ### OpenAI API による要約（任意）
 1. 環境変数 `OPENAI_API_KEY` を設定（例: `.env` に追記して起動前に読み込む）
-2. `pip install -r requirements.txt` で `openai` パッケージを導入
+2. `uv sync` で依存を導入（または `make install`）
 3. Views タブの「AI要約 (OpenAI)」を開き、
    - 「選択日の要因を要約」: 現在表示中の日付の価格/為替/フローを要約
    - 「全履歴を要約」: これまでの履歴から主要変動要因を俯瞰
