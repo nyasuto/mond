@@ -1,8 +1,9 @@
 import os
 import sqlite3
+from datetime import date as date_cls, timedelta
 from pathlib import Path
-from datetime import date as date_cls
 
+import pandas as pd
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,6 +75,63 @@ def q_all(conn: sqlite3.Connection, sql: str, params: tuple = ()):
     return [dict(r) for r in rows]
 
 
+def table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    )
+    return cur.fetchone() is not None
+
+
+def fetch_asset_prices(
+    conn: sqlite3.Connection,
+    tickers: list[str],
+    start: str,
+    end: str,
+) -> pd.DataFrame:
+    if not tickers or not table_exists(conn, "asset_prices"):
+        return pd.DataFrame()
+    placeholders = ",".join(["?"] * len(tickers))
+    sql = f"""
+        SELECT date, ticker, close
+        FROM asset_prices
+        WHERE date BETWEEN ? AND ?
+          AND ticker IN ({placeholders})
+        ORDER BY date, ticker
+    """
+    rows = q_all(conn, sql, (start, end, *tickers))
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+def fetch_fx_history(
+    conn: sqlite3.Connection,
+    pairs: list[str],
+    start: str,
+    end: str,
+) -> pd.DataFrame:
+    if not pairs or not table_exists(conn, "fx_rates"):
+        return pd.DataFrame()
+    placeholders = ",".join(["?"] * len(pairs))
+    sql = f"""
+        SELECT date, pair, rate
+        FROM fx_rates
+        WHERE date BETWEEN ? AND ?
+          AND pair IN ({placeholders})
+        ORDER BY date, pair
+    """
+    rows = q_all(conn, sql, (start, end, *pairs))
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
 def get_prev_snapshot(conn: sqlite3.Connection, ticker: str, d: str):
     rows = q_all(
         conn,
@@ -121,9 +179,10 @@ def main():
     sel_date = st.sidebar.date_input("対象日付", value=date_cls.today())
     sel_date_str = sel_date.strftime("%Y-%m-%d")
 
-    tabs = st.tabs(["Assets", "FX", "Snapshots", "Views"])
+    tabs = st.tabs(["Assets", "FX", "Snapshots", "Views", "Charts"])
+    tab_assets, tab_fx, tab_snapshots, tab_views, tab_charts = tabs
 
-    with tabs[0]:
+    with tab_assets:
         st.subheader("Assets（銘柄マスタ）")
         with st.form("asset_form"):
             ticker = st.text_input("Ticker", placeholder="VTI").strip()
@@ -139,7 +198,7 @@ def main():
         st.caption("一覧")
         st.dataframe(q_all(conn, "SELECT ticker, ccy, COALESCE(name,'') AS name FROM assets ORDER BY ticker"))
 
-    with tabs[1]:
+    with tab_fx:
         st.subheader("FX 対JPYレート")
         with st.form("fx_form"):
             d = st.date_input("日付", value=sel_date)
@@ -155,7 +214,7 @@ def main():
         st.caption(f"{sel_date_str} のFX")
         st.dataframe(q_all(conn, "SELECT date, pair, rate FROM fx_rates WHERE date = ? ORDER BY pair", (sel_date_str,)))
 
-    with tabs[2]:
+    with tab_snapshots:
         st.subheader("Snapshots（日次スナップショット）")
         assets = q_all(conn, "SELECT ticker FROM assets ORDER BY ticker")
         tickers = [a["ticker"] for a in assets]
@@ -226,7 +285,7 @@ def main():
         st.caption(f"{sel_date_str} のSnapshots")
         st.dataframe(q_all(conn, "SELECT date, ticker, qty, price_ccy FROM snapshots WHERE date = ? ORDER BY ticker", (sel_date_str,)))
 
-    with tabs[3]:
+    with tab_views:
         st.subheader("Views（評価/原因分解）")
         # ヘルパー：FX不足と合計検証
         with st.expander("データチェック"):
@@ -301,6 +360,80 @@ def main():
                     file_name=f"attribution_{sel_date_str}.csv",
                     mime="text/csv",
                 )
+
+    with tab_charts:
+        st.subheader("チャートビュー")
+        default_end = sel_date
+        default_start = max(sel_date - timedelta(days=30), date_cls(2000, 1, 1))
+        date_range = st.date_input(
+            "期間",
+            value=(default_start, default_end),
+            max_value=date_cls.today(),
+        )
+        if isinstance(date_range, tuple):
+            start_date, end_date = date_range
+        else:
+            start_date = date_range
+            end_date = date_range
+        if end_date < start_date:
+            st.error("終了日は開始日以降にしてください")
+        else:
+            start_iso = start_date.strftime("%Y-%m-%d")
+            end_iso = end_date.strftime("%Y-%m-%d")
+
+            price_tickers = [
+                row["ticker"]
+                for row in q_all(
+                    conn,
+                    "SELECT DISTINCT ticker FROM asset_prices ORDER BY ticker",
+                )
+            ] if table_exists(conn, "asset_prices") else []
+
+            fx_pairs = [
+                row["pair"]
+                for row in q_all(
+                    conn,
+                    "SELECT DISTINCT pair FROM fx_rates ORDER BY pair",
+                )
+            ] if table_exists(conn, "fx_rates") else []
+
+            col_price, col_fx = st.columns(2)
+
+            with col_price:
+                st.markdown("**Asset Prices**")
+                selected_prices = st.multiselect(
+                    "表示するティッカー",
+                    options=price_tickers,
+                    default=price_tickers[:2],
+                    help="asset_prices テーブルの終値を使用します",
+                )
+                df_prices = fetch_asset_prices(conn, selected_prices, start_iso, end_iso)
+                if df_prices.empty:
+                    st.info("指定期間に価格データがありません")
+                else:
+                    chart_df = (
+                        df_prices.pivot(index="date", columns="ticker", values="close")
+                        .sort_index()
+                    )
+                    st.line_chart(chart_df)
+
+            with col_fx:
+                st.markdown("**FX Rates**")
+                selected_pairs = st.multiselect(
+                    "表示する通貨ペア",
+                    options=fx_pairs,
+                    default=[p for p in fx_pairs if p.endswith("JPY")][:2],
+                    help="fx_rates テーブルのレートを使用します",
+                )
+                df_fx = fetch_fx_history(conn, selected_pairs, start_iso, end_iso)
+                if df_fx.empty:
+                    st.info("指定期間にFXデータがありません")
+                else:
+                    chart_df = (
+                        df_fx.pivot(index="date", columns="pair", values="rate")
+                        .sort_index()
+                    )
+                    st.line_chart(chart_df)
 
 
 if __name__ == "__main__":
