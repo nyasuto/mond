@@ -187,6 +187,15 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
    - Charts タブで `asset_prices` / `fx_rates` の任意期間をラインチャート表示
    - DB が存在しない場合は起動時に `schema.sql` を自動適用
 
+### OpenAI API による要約（任意）
+1. 環境変数 `OPENAI_API_KEY` を設定（例: `.env` に追記して起動前に読み込む）
+2. `pip install -r requirements.txt` で `openai` パッケージを導入
+3. Views タブの「AI要約 (OpenAI)」を開き、
+   - 「選択日の要因を要約」: 現在表示中の日付の価格/為替/フローを要約
+   - 「全履歴を要約」: これまでの履歴から主要変動要因を俯瞰
+
+※ API 利用料が発生します。キーが未設定の場合は従来通りUIのみが表示されます。
+
 ---
 
 より詳しい貢献ルールは `AGENTS.md` を参照してください。
