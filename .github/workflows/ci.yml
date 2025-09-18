@@ -12,6 +12,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
       - name: Install sqlite3
         run: sudo apt-get update && sudo apt-get install -y sqlite3
       - name: Run quality checks
