@@ -473,6 +473,77 @@ def main():
                     mime="text/csv",
                 )
 
+        st.markdown("---")
+        st.markdown("**v_portfolio_total**")
+        total_rows = q_all(
+            conn,
+            """
+            SELECT date, total_value_jpy
+              FROM v_portfolio_total
+             WHERE date = ?
+            """,
+            (sel_date_str,),
+        )
+        st.dataframe(total_rows)
+        if total_rows:
+            import pandas as pd
+
+            df_total = pd.DataFrame(total_rows)
+            st.download_button(
+                "Download v_portfolio_total CSV",
+                df_total.to_csv(index=False).encode("utf-8"),
+                file_name=f"portfolio_total_{sel_date_str}.csv",
+                mime="text/csv",
+            )
+
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("**v_currency_exposure**")
+            exposure_rows = q_all(
+                conn,
+                """
+                SELECT date, ccy, value_jpy
+                  FROM v_currency_exposure
+                 WHERE date = ?
+                 ORDER BY value_jpy DESC
+                """,
+                (sel_date_str,),
+            )
+            st.dataframe(exposure_rows)
+            if exposure_rows:
+                import pandas as pd
+
+                df_exp = pd.DataFrame(exposure_rows)
+                st.download_button(
+                    "Download v_currency_exposure CSV",
+                    df_exp.to_csv(index=False).encode("utf-8"),
+                    file_name=f"currency_exposure_{sel_date_str}.csv",
+                    mime="text/csv",
+                )
+        with col4:
+            st.markdown("**v_valuation_enriched**")
+            enriched_rows = q_all(
+                conn,
+                """
+                SELECT date, ticker, value_jpy, portfolio_value_jpy, weight
+                  FROM v_valuation_enriched
+                 WHERE date = ?
+                 ORDER BY value_jpy DESC
+                """,
+                (sel_date_str,),
+            )
+            st.dataframe(enriched_rows)
+            if enriched_rows:
+                import pandas as pd
+
+                df_enriched = pd.DataFrame(enriched_rows)
+                st.download_button(
+                    "Download v_valuation_enriched CSV",
+                    df_enriched.to_csv(index=False).encode("utf-8"),
+                    file_name=f"valuation_enriched_{sel_date_str}.csv",
+                    mime="text/csv",
+                )
+
     with tab_charts:
         st.subheader("チャートビュー")
         default_end = sel_date

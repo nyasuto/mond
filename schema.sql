@@ -64,6 +64,46 @@ FROM snapshots s
 JOIN assets a ON a.ticker = s.ticker
 LEFT JOIN fx_rates r ON r.date = s.date AND r.pair = (a.ccy || 'JPY');
 
+DROP VIEW IF EXISTS v_portfolio_total;
+CREATE VIEW v_portfolio_total AS
+SELECT
+  date,
+  SUM(value_jpy) AS total_value_jpy
+FROM v_valuation
+GROUP BY date;
+
+DROP VIEW IF EXISTS v_currency_exposure;
+CREATE VIEW v_currency_exposure AS
+SELECT
+  date,
+  ccy,
+  SUM(value_jpy) AS value_jpy
+FROM v_valuation
+GROUP BY date, ccy;
+
+DROP VIEW IF EXISTS v_valuation_enriched;
+CREATE VIEW v_valuation_enriched AS
+WITH totals AS (
+  SELECT date, SUM(value_jpy) AS portfolio_value_jpy
+  FROM v_valuation
+  GROUP BY date
+)
+SELECT
+  v.date,
+  v.ticker,
+  v.ccy,
+  v.qty,
+  v.price_ccy,
+  v.fx_rate,
+  v.value_jpy,
+  t.portfolio_value_jpy,
+  CASE
+    WHEN t.portfolio_value_jpy > 0 THEN v.value_jpy / t.portfolio_value_jpy
+    ELSE NULL
+  END AS weight
+FROM v_valuation v
+JOIN totals t ON t.date = v.date;
+
 -- View: attribution of daily change into price, fx, cross, and flow
 DROP VIEW IF EXISTS v_attribution;
 CREATE VIEW v_attribution AS

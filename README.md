@@ -75,6 +75,30 @@ Money Diary は、個人利用に特化した資産・収支トラッキング�
    ./scripts/test.sh
    ```
 
+## 便利ビュー
+
+- ポートフォリオ合計（円換算）
+  ```sql
+  SELECT *
+    FROM v_portfolio_total
+   ORDER BY date DESC
+   LIMIT 5;
+  ```
+- 通貨別エクスポージャ
+  ```sql
+  SELECT *
+    FROM v_currency_exposure
+   WHERE date = 'YYYY-MM-DD'
+   ORDER BY ccy;
+  ```
+- 銘柄別ウェイト付き評価額
+  ```sql
+  SELECT date, ticker, value_jpy, portfolio_value_jpy, round(weight, 4) AS weight
+   FROM v_valuation_enriched
+   WHERE date = 'YYYY-MM-DD'
+   ORDER BY value_jpy DESC;
+  ```
+
 ## ER 図
 
 主要テーブルの関係は以下のとおりです（`docs/er.mermaid` と同期）。
