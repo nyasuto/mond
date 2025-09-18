@@ -15,11 +15,25 @@ def get_conn(db_path: Path) -> sqlite3.Connection:
     need_init = not db_path.exists()
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
     if need_init:
-        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
-            sql = f.read()
-        conn.executescript(sql)
+        conn.executescript(schema_sql)
         conn.commit()
+    else:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='view'"
+        )
+        views = {row[0] for row in cur.fetchall()}
+        required = {
+            "v_portfolio_total",
+            "v_currency_exposure",
+            "v_valuation_enriched",
+        }
+        if not required.issubset(views):
+            conn.executescript(schema_sql)
+            conn.commit()
     return conn
 
 
