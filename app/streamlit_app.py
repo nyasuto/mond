@@ -470,12 +470,11 @@ def main():
                             )
                             st.rerun()
 
-        st.caption(f"{sel_date_str} のSnapshots")
+        st.caption("登録済み Snapshots 一覧")
         st.dataframe(
             q_all(
                 conn,
-                "SELECT date, ticker, qty, price_ccy FROM snapshots WHERE date = ? ORDER BY ticker",
-                (sel_date_str,),
+                "SELECT date, ticker, qty, price_ccy FROM snapshots ORDER BY date DESC, ticker",
             )
         )
 
