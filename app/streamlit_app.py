@@ -168,6 +168,37 @@ def fx_missing_for_date(conn: sqlite3.Connection, d: str):
     )
 
 
+def get_asset_meta(conn: sqlite3.Connection) -> dict[str, dict[str, str | None]]:
+    meta: dict[str, dict[str, str | None]] = {}
+    for row in q_all(conn, "SELECT ticker, ccy, name FROM assets"):
+        meta[row["ticker"]] = {"ccy": row["ccy"], "name": row.get("name") if isinstance(row, dict) else None}
+    return meta
+
+
+def get_price_ccy(conn: sqlite3.Connection, ticker: str, date: str) -> float | None:
+    rows = q_all(
+        conn,
+        "SELECT close FROM asset_prices WHERE ticker = ? AND date = ?",
+        (ticker, date),
+    )
+    if not rows:
+        return None
+    return float(rows[0]["close"])
+
+
+def get_fx_rate(conn: sqlite3.Connection, ccy: str, date: str) -> float | None:
+    if ccy == "JPY":
+        return 1.0
+    rows = q_all(
+        conn,
+        "SELECT rate FROM fx_rates WHERE pair = ? AND date = ?",
+        (f"{ccy}JPY", date),
+    )
+    if not rows:
+        return None
+    return float(rows[0]["rate"])
+
+
 def main():
     st.set_page_config(page_title="Money Diary", layout="wide")
     st.title("Money Diary – ローカルGUI")
@@ -216,13 +247,14 @@ def main():
 
     with tab_snapshots:
         st.subheader("Snapshots（日次スナップショット）")
-        assets = q_all(conn, "SELECT ticker FROM assets ORDER BY ticker")
-        tickers = [a["ticker"] for a in assets]
-        # セッション状態の初期化
-        if "prefill_qty" not in st.session_state:
-            st.session_state.prefill_qty = 0.0
-        if "prefill_price" not in st.session_state:
-            st.session_state.prefill_price = 0.0
+        asset_meta = get_asset_meta(conn)
+        tickers = sorted(asset_meta.keys())
+
+        state = st.session_state
+        state.setdefault("snap_qty", 0.0)
+        state.setdefault("snap_price", 0.0)
+        state.setdefault("snap_amount_jpy", 0.0)
+        state.setdefault("snap_selection", "")
 
         with st.form("snap_form"):
             d = st.date_input("日付", value=sel_date, key="snap_date")
@@ -231,59 +263,123 @@ def main():
                 if tickers
                 else st.text_input("Ticker", key="snap_ticker_text")
             )
-            # 前回値の読み込みボタン（フォーム内）
+            date_iso = d.strftime("%Y-%m-%d")
+            meta = asset_meta.get(ticker) if ticker else None
+            ccy = meta.get("ccy") if meta else None
+            price_auto = get_price_ccy(conn, ticker, date_iso) if ticker else None
+            fx_auto = get_fx_rate(conn, ccy, date_iso) if ccy else None
+
+            selection_key = f"{ticker}|{date_iso}"
+            if selection_key != state.snap_selection:
+                state.snap_selection = selection_key
+                if price_auto is not None:
+                    state.snap_price = float(price_auto)
+                # リセットは明示ボタンで行う
+
+            # 情報表示
+            info_cols = st.columns(3)
+            with info_cols[0]:
+                st.metric("通貨", ccy or "?")
+            with info_cols[1]:
+                st.metric("価格 (price_ccy)", f"{price_auto:.4f}" if price_auto else "-")
+            with info_cols[2]:
+                fx_label = f"{ccy}JPY" if ccy and ccy != "JPY" else "JPY"
+                st.metric("FXレート", f"{fx_auto:.4f}" if fx_auto else ("1" if ccy == "JPY" else "-"))
+
             colp1, colp2, colp3 = st.columns([1, 1, 2])
             with colp1:
                 load_prev = st.form_submit_button("前回値を読み込む")
             with colp2:
                 reset_vals = st.form_submit_button("値をクリア")
 
-            # 数値入力（セッション状態から初期値を反映）
-            qty = st.number_input(
-                "数量 qty",
+            amount_jpy = st.number_input(
+                "評価額 (JPY)",
                 min_value=0.0,
-                step=0.0001,
-                format="%f",
-                value=float(st.session_state.prefill_qty),
-                key="snap_qty",
+                step=1000.0,
+                key="snap_amount_jpy",
             )
             price = st.number_input(
                 "現地通貨建て価格 price_ccy",
                 min_value=0.0,
                 step=0.0001,
                 format="%f",
-                value=float(st.session_state.prefill_price),
                 key="snap_price",
             )
+            qty = st.number_input(
+                "数量 qty (手動入力も可)",
+                min_value=0.0,
+                step=0.0001,
+                format="%f",
+                key="snap_qty",
+            )
+
+            fx_for_calc = fx_auto if fx_auto is not None else (1.0 if ccy == "JPY" else None)
+            computed_qty = None
+            if amount_jpy > 0 and price > 0 and fx_for_calc:
+                computed_qty = amount_jpy / (price * fx_for_calc)
+                st.caption(f"推計数量（評価額 ÷ 価格 × FX）: {computed_qty:.4f}")
+            elif amount_jpy > 0 and price > 0:
+                st.warning("FXレートが不足しているため、自動計算できません。FXタブでレートを追加してください。")
+
             submitted = st.form_submit_button("追加/更新")
 
-            # ハンドリング（ボタンの優先順序: クリア > 読込 > 保存）
             if reset_vals:
-                st.session_state.prefill_qty = 0.0
-                st.session_state.prefill_price = 0.0
+                state.snap_qty = 0.0
+                state.snap_price = 0.0
+                state.snap_amount_jpy = 0.0
                 st.rerun()
+
             if load_prev:
-                tkr = ticker if tickers else st.session_state.get("snap_ticker_text", "").strip()
+                tkr = ticker if tickers else state.get("snap_ticker_text", "").strip()
                 if tkr:
-                    prev = get_prev_snapshot(conn, tkr, d.strftime("%Y-%m-%d"))
+                    prev = get_prev_snapshot(conn, tkr, date_iso)
                     if prev:
-                        st.session_state.prefill_qty = float(prev["qty"])
-                        st.session_state.prefill_price = float(prev["price_ccy"])
+                        state.snap_qty = float(prev["qty"])
+                        state.snap_price = float(prev["price_ccy"])
+                        prev_meta = asset_meta.get(tkr)
+                        prev_ccy = prev_meta.get("ccy") if prev_meta else "JPY"
+                        prev_fx = get_fx_rate(conn, prev_ccy, prev["date"]) or (1.0 if prev_ccy == "JPY" else 0.0)
+                        state.snap_amount_jpy = float(prev["qty"]) * float(prev["price_ccy"]) * (prev_fx or 0.0)
                         st.success(f"前回 {prev['date']} から qty/price を読み込みました")
                         st.rerun()
                     else:
                         st.info("前回スナップショットは見つかりませんでした")
                 else:
                     st.error("Ticker を選択してください")
+
             if submitted:
-                tkr = ticker if tickers else st.session_state.get("snap_ticker_text", "")
+                tkr = ticker if tickers else state.get("snap_ticker_text", "").strip()
                 if not tkr:
                     st.error("Ticker は必須です")
                 else:
-                    upsert_snapshot(conn, d.strftime("%Y-%m-%d"), tkr, float(qty), float(price))
-                    st.success(f"登録: {d} {tkr} qty={qty} price={price}")
+                    price_to_store = float(price)
+                    if price_to_store <= 0:
+                        st.error("価格は 0 より大きい必要があります")
+                    else:
+                        if amount_jpy > 0:
+                            if not fx_for_calc:
+                                st.error("FXレートが不足しているため、JPYから数量を算出できません")
+                            else:
+                                qty_to_store = amount_jpy / (price_to_store * fx_for_calc)
+                        else:
+                            qty_to_store = float(qty)
+                        if amount_jpy == 0 or fx_for_calc:
+                            upsert_snapshot(conn, date_iso, tkr, float(qty_to_store), price_to_store)
+                            state.snap_qty = float(qty_to_store)
+                            state.snap_price = price_to_store
+                            state.snap_amount_jpy = float(amount_jpy)
+                            st.success(
+                                f"登録: {date_iso} {tkr} qty={qty_to_store:.4f} price={price_to_store:.4f}"
+                            )
+
         st.caption(f"{sel_date_str} のSnapshots")
-        st.dataframe(q_all(conn, "SELECT date, ticker, qty, price_ccy FROM snapshots WHERE date = ? ORDER BY ticker", (sel_date_str,)))
+        st.dataframe(
+            q_all(
+                conn,
+                "SELECT date, ticker, qty, price_ccy FROM snapshots WHERE date = ? ORDER BY ticker",
+                (sel_date_str,),
+            )
+        )
 
     with tab_views:
         st.subheader("Views（評価/原因分解）")

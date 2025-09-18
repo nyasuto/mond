@@ -158,6 +158,7 @@ CI: push / PR ごとに GitHub Actions で `make quality` が実行されます�
   - `streamlit run app/streamlit_app.py`
 - 機能
   - Assets/Fx/Snapshots のフォーム入力（UPSERT）
+  - Snapshots で「評価額 (JPY)」入力から数量自動算出（価格・為替が揃っている場合）
   - 指定日付の `v_valuation` と `v_attribution` を一覧・CSVダウンロード
   - Charts タブで `asset_prices` / `fx_rates` のラインチャート表示
   - DB が無ければ初回起動時に `schema.sql` を適用
