@@ -501,7 +501,6 @@ def main():
             with info_cols[1]:
                 st.metric("価格 (price_ccy)", f"{price_auto:.4f}" if price_auto else "-")
             with info_cols[2]:
-                fx_label = f"{ccy}JPY" if ccy and ccy != "JPY" else "JPY"
                 st.metric("FXレート", f"{fx_auto:.4f}" if fx_auto else ("1" if ccy == "JPY" else "-"))
 
             colp1, colp2, colp3 = st.columns([1, 1, 2])

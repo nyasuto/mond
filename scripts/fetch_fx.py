@@ -9,7 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from typing import Dict, Iterable
+from typing import Dict
 
 BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&period1={start}&period2={end}"
 

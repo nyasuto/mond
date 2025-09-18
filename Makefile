@@ -4,9 +4,10 @@ VENV ?= .venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 STREAMLIT := $(VENV)/bin/streamlit
+RUFF := $(VENV)/bin/ruff
 DB ?= money_diary.db
 
-.PHONY: help venv install db-init db-reset gui test quality clean
+.PHONY: help venv install db-init db-reset gui lint test quality clean
 
 help:
 	@echo "Available targets:"
@@ -15,6 +16,7 @@ help:
 	@echo "  make db-init     # Initialize SQLite schema (creates $(DB))"
 	@echo "  make db-reset    # Reset DB (drops and re-initializes $(DB))"
 	@echo "  make gui         # Launch Streamlit GUI"
+	@echo "  make lint        # Run ruff lint"
 	@echo "  make test        # Run SQL regression tests"
 	@echo "  make quality     # Run quality checks (tests, linters)"
 	@echo "  make clean       # Remove virtualenv and DB"
@@ -38,10 +40,14 @@ db-reset:
 gui: install
 	$(STREAMLIT) run app/streamlit_app.py
 
+lint: install
+	$(RUFF) check app
+	$(RUFF) check scripts
+
 test:
 	./scripts/test.sh
 
-quality: test
+quality: lint test
 
 clean:
 	rm -rf $(VENV)
