@@ -146,6 +146,54 @@ def fetch_fx_history(
     return df
 
 
+def fetch_portfolio_history(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+) -> pd.DataFrame:
+    if not table_exists(conn, "v_portfolio_total"):
+        return pd.DataFrame()
+    rows = q_all(
+        conn,
+        """
+        SELECT date, total_value_jpy
+          FROM v_portfolio_total
+         WHERE date BETWEEN ? AND ?
+         ORDER BY date
+        """,
+        (start, end),
+    )
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+def fetch_currency_history(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+) -> pd.DataFrame:
+    if not table_exists(conn, "v_currency_exposure"):
+        return pd.DataFrame()
+    rows = q_all(
+        conn,
+        """
+        SELECT date, ccy, value_jpy
+          FROM v_currency_exposure
+         WHERE date BETWEEN ? AND ?
+         ORDER BY date, ccy
+        """,
+        (start, end),
+    )
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
 def get_prev_snapshot(conn: sqlite3.Connection, ticker: str, d: str):
     rows = q_all(
         conn,
@@ -557,6 +605,41 @@ def main():
                     file_name=f"valuation_enriched_{sel_date_str}.csv",
                     mime="text/csv",
                 )
+
+        st.markdown("---")
+        st.markdown("**推移（折れ線グラフ）**")
+        history_days = st.slider(
+            "履歴表示（日数）",
+            min_value=7,
+            max_value=180,
+            value=30,
+            step=1,
+            key="views_history_days",
+        )
+        history_start = sel_date - timedelta(days=history_days - 1)
+        start_iso_hist = history_start.strftime("%Y-%m-%d")
+
+        portfolio_hist = fetch_portfolio_history(conn, start_iso_hist, sel_date_str)
+        currency_hist = fetch_currency_history(conn, start_iso_hist, sel_date_str)
+
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            st.caption("ポートフォリオ合計（JPY）")
+            if portfolio_hist.empty:
+                st.info("表示可能な履歴がありません")
+            else:
+                chart_df = portfolio_hist.set_index("date")["total_value_jpy"]
+                st.line_chart(chart_df, height=240)
+        with chart_col2:
+            st.caption("通貨別エクスポージャ（JPY）")
+            if currency_hist.empty:
+                st.info("表示可能な履歴がありません")
+            else:
+                pivot_df = (
+                    currency_hist.pivot(index="date", columns="ccy", values="value_jpy")
+                    .sort_index()
+                )
+                st.line_chart(pivot_df, height=240)
 
     with tab_charts:
         st.subheader("チャートビュー")
