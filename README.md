@@ -162,6 +162,7 @@ erDiagram
 make help
 make venv && make install
 make db-init
+make lint
 make test
 make quality
 make gui
