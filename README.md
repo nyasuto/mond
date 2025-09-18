@@ -170,15 +170,19 @@ make gui
 CI（GitHub Actions）では push / PR ごとに `make quality` が実行されます。
 
 ### GUI 入力（Streamlit）
-1. 初回セットアップ
+1. 初回セットアップ（uv を利用）
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
+   # uv が未インストールの場合: https://docs.astral.sh/uv/getting-started/ を参照
+   uv python install 3.12
+   uv venv --python 3.12
+   uv pip install -r requirements.txt
+   # もしくは make install（uv 実行をラップ）
+   make install
    ```
-2. 起動
+2. 起動（`.venv` を自動利用）
    ```bash
-   streamlit run app/streamlit_app.py
+   make gui
+   # 直接起動したい場合: uv run streamlit run app/streamlit_app.py
    ```
 3. 主な機能
    - Assets / FX / Snapshots のフォーム入力（UPSERT）

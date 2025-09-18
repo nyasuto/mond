@@ -12,19 +12,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
-          python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: requirements.txt
-      - name: Cache virtualenv
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            venv-${{ runner.os }}-
+          version: latest
       - name: Ensure sqlite3
         run: |
           if ! command -v sqlite3 >/dev/null 2>&1; then
@@ -34,4 +25,8 @@ jobs:
             sqlite3 --version
           fi
       - name: Run quality checks
-        run: make quality
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12
+          uv pip install -r requirements.txt
+          make quality
