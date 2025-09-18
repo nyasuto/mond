@@ -92,7 +92,7 @@ def q_all(conn: sqlite3.Connection, sql: str, params: tuple = ()):
 def table_exists(conn: sqlite3.Connection, table: str) -> bool:
     cur = conn.cursor()
     cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name=?",
         (table,),
     )
     return cur.fetchone() is not None
