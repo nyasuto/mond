@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from datetime import date as date_cls, datetime, timedelta
@@ -5,6 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover
+    OpenAI = None
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_DEFAULT = ROOT / "money_diary.db"
@@ -214,6 +220,124 @@ def fetch_currency_history(
     return df
 
 
+def get_attribution_for_date(conn: sqlite3.Connection, date: str):
+    return q_all(
+        conn,
+        """
+        SELECT ticker, delta_total, delta_price, delta_fx, delta_cross, flow
+          FROM v_attribution
+         WHERE date = ?
+         ORDER BY CASE WHEN ticker = 'PORTFOLIO' THEN 0 ELSE 1 END, ticker
+        """,
+        (date,),
+    )
+
+
+def get_attribution_history(conn: sqlite3.Connection, limit: int | None = None):
+    sql = """
+        SELECT date, ticker, delta_total, delta_price, delta_fx, delta_cross, flow
+          FROM v_attribution
+         ORDER BY date, CASE WHEN ticker = 'PORTFOLIO' THEN 0 ELSE 1 END, ticker
+    """
+    rows = q_all(conn, sql)
+    if limit:
+        rows = rows[-limit:]
+    return rows
+
+
+def get_currency_exposure_for_date(conn: sqlite3.Connection, date: str):
+    return q_all(
+        conn,
+        """
+        SELECT ccy, value_jpy
+          FROM v_currency_exposure
+         WHERE date = ?
+         ORDER BY value_jpy DESC
+        """,
+        (date,),
+    )
+
+
+def get_portfolio_total_for_date(conn: sqlite3.Connection, date: str):
+    rows = q_all(
+        conn,
+        "SELECT total_value_jpy FROM v_portfolio_total WHERE date = ?",
+        (date,),
+    )
+    return rows[0]["total_value_jpy"] if rows else None
+
+
+def get_portfolio_totals_history(conn: sqlite3.Connection, limit: int | None = None):
+    sql = "SELECT date, total_value_jpy FROM v_portfolio_total ORDER BY date"
+    rows = q_all(conn, sql)
+    if limit:
+        rows = rows[-limit:]
+    return rows
+
+
+def openai_available() -> bool:
+    return OpenAI is not None and bool(os.getenv("OPENAI_API_KEY"))
+
+
+def build_day_prompt(date: str, attribution, exposure, total_value) -> str:
+    payload = {
+        "date": date,
+        "portfolio_total_jpy": total_value,
+        "attribution": attribution,
+        "currency_exposure": exposure,
+    }
+    return (
+        "You are a financial analyst who explains daily portfolio movements in Japanese. "
+        "Summarize the key drivers (price, FX, cross, flow) for the portfolio on the given date. "
+        "Highlight notable tickers and percent contributions if obvious."
+        "\n\nData(JSON):\n"
+        + json.dumps(payload, ensure_ascii=False)
+        + "\n\nOutput format: short bullet list in Japanese with overall conclusion."
+    )
+
+
+def build_history_prompt(attribution_history, totals_history) -> str:
+    payload = {
+        "attribution_history": attribution_history,
+        "portfolio_totals": totals_history,
+    }
+    return (
+        "You are a financial analyst. Review the entire attribution history and portfolio totals "
+        "to identify major turning points, recurring drivers, and any long-term trends."
+        " Provide insights in Japanese, covering key dates, main contributing tickers, and suggestions "
+        "for what deserves attention.\n\nData(JSON):\n"
+        + json.dumps(payload, ensure_ascii=False)
+        + "\n\nOutput format: short paragraphs with bullet list of highlights in Japanese."
+    )
+
+
+def summarize_with_openai(prompt: str) -> str:
+    if OpenAI is None:
+        raise RuntimeError("openai パッケージがインストールされていません")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY が設定されていません")
+    client = OpenAI(api_key=api_key)
+    try:
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            input=prompt,
+        )
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError(f"OpenAI API 呼び出しに失敗しました: {exc}")
+
+    text = getattr(response, "output_text", "")
+    if text:
+        return text.strip()
+    # fallback for older client structures
+    chunks = []
+    for item in getattr(response, "output", []) or []:
+        for block in getattr(item, "content", []) or []:
+            if getattr(block, "type", None) == "output_text":
+                chunks.append(getattr(block, "text", ""))
+    if chunks:
+        return "\n".join(chunks).strip()
+    return str(response)
 def get_prev_snapshot(conn: sqlite3.Connection, ticker: str, d: str):
     rows = q_all(
         conn,
@@ -659,16 +783,65 @@ def main():
                     else:
                         chart_df = portfolio_hist.set_index("date")["total_value_jpy"]
                         st.line_chart(chart_df, height=240)
-                with chart_col2:
-                    st.caption("通貨別エクスポージャ（JPY）")
-                    if currency_hist.empty:
-                        st.info("表示可能な履歴がありません")
+        with chart_col2:
+            st.caption("通貨別エクスポージャ（JPY）")
+            if currency_hist.empty:
+                st.info("表示可能な履歴がありません")
+            else:
+                pivot_df = (
+                    currency_hist.pivot(index="date", columns="ccy", values="value_jpy")
+                    .sort_index()
+                )
+                st.line_chart(pivot_df, height=240)
+
+        st.markdown("---")
+        with st.expander("AI要約 (OpenAI)"):
+            if OpenAI is None:
+                st.info("`openai` パッケージがインストールされていません。`pip install -r requirements.txt` を実行してください。")
+            elif not os.getenv("OPENAI_API_KEY"):
+                st.warning("環境変数 OPENAI_API_KEY を設定すると要約機能が利用できます。例: `.env` にキーを保存し、起動前に読み込んでください。")
+            else:
+                st.caption("OpenAI API を利用して変動要因を要約します。API利用料が発生する点に注意してください。")
+                day_col, hist_col = st.columns(2)
+                day_summary_key = f"ai_summary_day_{sel_date_str}"
+                hist_summary_key = "ai_summary_history"
+
+                if day_col.button("選択日の要因を要約", key=f"btn_ai_day_{sel_date_str}"):
+                    attribution = get_attribution_for_date(conn, sel_date_str)
+                    if not attribution:
+                        st.info("この日付の原因分解データがありません。")
                     else:
-                        pivot_df = (
-                            currency_hist.pivot(index="date", columns="ccy", values="value_jpy")
-                            .sort_index()
-                        )
-                        st.line_chart(pivot_df, height=240)
+                        exposure = get_currency_exposure_for_date(conn, sel_date_str)
+                        total_value = get_portfolio_total_for_date(conn, sel_date_str)
+                        prompt = build_day_prompt(sel_date_str, attribution, exposure, total_value)
+                        with st.spinner("OpenAI に問い合わせ中..."):
+                            try:
+                                summary = summarize_with_openai(prompt)
+                                st.session_state[day_summary_key] = summary
+                            except RuntimeError as exc:
+                                st.error(str(exc))
+
+                if hist_col.button("全履歴を要約", key="btn_ai_history"):
+                    attribution_history = get_attribution_history(conn)
+                    if not attribution_history:
+                        st.info("原因分解の履歴データがありません。")
+                    else:
+                        totals_history = get_portfolio_totals_history(conn)
+                        prompt = build_history_prompt(attribution_history, totals_history)
+                        with st.spinner("OpenAI に問い合わせ中..."):
+                            try:
+                                summary = summarize_with_openai(prompt)
+                                st.session_state[hist_summary_key] = summary
+                            except RuntimeError as exc:
+                                st.error(str(exc))
+
+                if day_summary_key in st.session_state:
+                    st.markdown("#### 選択日の要約")
+                    st.markdown(st.session_state[day_summary_key])
+
+                if hist_summary_key in st.session_state:
+                    st.markdown("#### 履歴要約")
+                    st.markdown(st.session_state[hist_summary_key])
 
     with tab_charts:
         st.subheader("チャートビュー")
