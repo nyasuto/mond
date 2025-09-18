@@ -94,7 +94,7 @@ Money Diary は、個人利用に特化した資産・収支トラッキング�
 - 銘柄別ウェイト付き評価額
   ```sql
   SELECT date, ticker, value_jpy, portfolio_value_jpy, round(weight, 4) AS weight
-    FROM v_valuation_enriched
+   FROM v_valuation_enriched
    WHERE date = 'YYYY-MM-DD'
    ORDER BY value_jpy DESC;
   ```
