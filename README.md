@@ -183,7 +183,7 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
    - Assets / FX / Snapshots のフォーム入力（UPSERT）
    - Snapshots で「評価額 (JPY)」入力から数量を自動算出（価格・為替が揃っている場合）
    - Views タブで `v_valuation` / `v_attribution` に加え、ポートフォリオ合計・通貨別エクスポージャ・ウェイト付き評価額を表示（CSVダウンロード可）
-   - Views タブで直近○日分のポートフォリオ合計と通貨別エクスポージャを折れ線グラフ表示
+   - Views タブでポートフォリオ合計と通貨別エクスポージャの履歴を（日付範囲スライダーで）折れ線グラフ表示
    - Charts タブで `asset_prices` / `fx_rates` の任意期間をラインチャート表示
    - DB が存在しない場合は起動時に `schema.sql` を自動適用
 

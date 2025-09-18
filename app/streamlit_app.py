@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import date as date_cls, timedelta
+from datetime import date as date_cls, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -144,6 +144,26 @@ def fetch_fx_history(
     df = pd.DataFrame(rows)
     df["date"] = pd.to_datetime(df["date"])
     return df
+
+
+def get_portfolio_date_range(conn: sqlite3.Connection) -> tuple[date_cls | None, date_cls | None]:
+    if not table_exists(conn, "v_portfolio_total"):
+        return (None, None)
+    rows = q_all(
+        conn,
+        "SELECT MIN(date) AS min_date, MAX(date) AS max_date FROM v_portfolio_total",
+    )
+    if not rows:
+        return (None, None)
+    row = rows[0]
+    min_date = row.get("min_date")
+    max_date = row.get("max_date")
+    if not min_date or not max_date:
+        return (None, None)
+    return (
+        datetime.strptime(min_date, "%Y-%m-%d").date(),
+        datetime.strptime(max_date, "%Y-%m-%d").date(),
+    )
 
 
 def fetch_portfolio_history(
@@ -608,38 +628,48 @@ def main():
 
         st.markdown("---")
         st.markdown("**推移（折れ線グラフ）**")
-        history_days = st.slider(
-            "履歴表示（日数）",
-            min_value=7,
-            max_value=180,
-            value=30,
-            step=1,
-            key="views_history_days",
-        )
-        history_start = sel_date - timedelta(days=history_days - 1)
-        start_iso_hist = history_start.strftime("%Y-%m-%d")
-
-        portfolio_hist = fetch_portfolio_history(conn, start_iso_hist, sel_date_str)
-        currency_hist = fetch_currency_history(conn, start_iso_hist, sel_date_str)
-
-        chart_col1, chart_col2 = st.columns(2)
-        with chart_col1:
-            st.caption("ポートフォリオ合計（JPY）")
-            if portfolio_hist.empty:
-                st.info("表示可能な履歴がありません")
+        min_hist, max_hist = get_portfolio_date_range(conn)
+        if not min_hist or not max_hist:
+            st.info("ポートフォリオ履歴を表示するには v_portfolio_total にデータが必要です")
+        else:
+            max_hist = min(max_hist, sel_date)
+            if max_hist < min_hist:
+                st.info("選択中の日付より前の履歴がありません")
             else:
-                chart_df = portfolio_hist.set_index("date")["total_value_jpy"]
-                st.line_chart(chart_df, height=240)
-        with chart_col2:
-            st.caption("通貨別エクスポージャ（JPY）")
-            if currency_hist.empty:
-                st.info("表示可能な履歴がありません")
-            else:
-                pivot_df = (
-                    currency_hist.pivot(index="date", columns="ccy", values="value_jpy")
-                    .sort_index()
+                default_start = max(min_hist, max_hist - timedelta(days=29))
+                start_date_hist, end_date_hist = st.slider(
+                    "表示期間",
+                    min_value=min_hist,
+                    max_value=max_hist,
+                    value=(default_start, max_hist),
+                    format="%Y-%m-%d",
+                    key="views_history_range",
                 )
-                st.line_chart(pivot_df, height=240)
+
+                start_iso_hist = start_date_hist.strftime("%Y-%m-%d")
+                end_iso_hist = end_date_hist.strftime("%Y-%m-%d")
+
+                portfolio_hist = fetch_portfolio_history(conn, start_iso_hist, end_iso_hist)
+                currency_hist = fetch_currency_history(conn, start_iso_hist, end_iso_hist)
+
+                chart_col1, chart_col2 = st.columns(2)
+                with chart_col1:
+                    st.caption("ポートフォリオ合計（JPY）")
+                    if portfolio_hist.empty:
+                        st.info("表示可能な履歴がありません")
+                    else:
+                        chart_df = portfolio_hist.set_index("date")["total_value_jpy"]
+                        st.line_chart(chart_df, height=240)
+                with chart_col2:
+                    st.caption("通貨別エクスポージャ（JPY）")
+                    if currency_hist.empty:
+                        st.info("表示可能な履歴がありません")
+                    else:
+                        pivot_df = (
+                            currency_hist.pivot(index="date", columns="ccy", values="value_jpy")
+                            .sort_index()
+                        )
+                        st.line_chart(pivot_df, height=240)
 
     with tab_charts:
         st.subheader("チャートビュー")
