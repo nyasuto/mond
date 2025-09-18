@@ -174,6 +174,7 @@ CI（GitHub Actions）では push / PR ごとに `make quality` が実行され�
    ```bash
    # uv が未インストールの場合: https://docs.astral.sh/uv/getting-started/ を参照
    uv python install 3.12
+   uv venv --python 3.12
    uv sync
    # もしくは make install（uv 実行をラップ）
    make install

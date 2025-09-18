@@ -18,6 +18,7 @@ help:
 
 install: pyproject.toml
 	$(UV) python install 3.12
+	$(UV) venv --python 3.12
 	$(UV) sync
 
 # Initialize DB once (non-destructive if file exists)
