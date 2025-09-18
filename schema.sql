@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS fx_rates (
   PRIMARY KEY (date, pair)
 );
 
+-- Daily close prices per asset (fetched from external APIs)
+CREATE TABLE IF NOT EXISTS asset_prices (
+  date   TEXT NOT NULL CHECK (date LIKE '____-__-__'),
+  ticker TEXT NOT NULL,
+  close  REAL NOT NULL CHECK (close >= 0),
+  PRIMARY KEY (date, ticker)
+);
+
 -- Daily snapshots per asset (qty * price_ccy)
 CREATE TABLE IF NOT EXISTS snapshots (
   date       TEXT NOT NULL CHECK (date LIKE '____-__-__'),
