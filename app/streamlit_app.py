@@ -6,15 +6,20 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+DB_DEFAULT = ROOT / "money_diary.db"
+SCHEMA_PATH = ROOT / "schema.sql"
+
+env_path = ROOT / ".env"
+load_dotenv(env_path)
+
 
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover
     OpenAI = None
-
-ROOT = Path(__file__).resolve().parent.parent
-DB_DEFAULT = ROOT / "money_diary.db"
-SCHEMA_PATH = ROOT / "schema.sql"
 
 
 def get_conn(db_path: Path) -> sqlite3.Connection:
