@@ -45,6 +45,16 @@ INSERT INTO assets (ticker, ccy) VALUES ('eMAXIS_SP500','JPY');
 
 INSERT INTO fx_rates (date, pair, rate) VALUES ('2025-09-15','USDJPY',145.2);
 
+または自動取得:
+
+```
+# 単日
+./scripts/fetch_fx.py 2025-09-15 2025-09-15 USD JPY --db money_diary.db
+
+# 直近1年分（開始日と終了日を指定）
+./scripts/fetch_fx.py 2023-09-18 2024-09-18 USD JPY --db money_diary.db
+```
+
 
 	4.	日次スナップショット入力
 
