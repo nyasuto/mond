@@ -33,6 +33,7 @@
 - Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`.
 - One logical change per commit; include schema and view updates together with minimal seed data for reproduction.
 - PRs include: purpose, schema diffs, example queries/outputs, and any migration steps. Link issues if applicable; add screenshots for visualization changes.
+- Do **not** merge your own pull requests. Always request review/approval from another contributor.
 
 ## PR 記述スタイル（日本語）
 - 見出し構成: `概要`, `変更点`, `背景/目的`, `使い方/確認方法`, `関連Issue`, `チェックリスト`。
