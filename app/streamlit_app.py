@@ -256,6 +256,18 @@ def main():
         state.setdefault("snap_amount_jpy", 0.0)
         state.setdefault("snap_selection", "")
 
+        if state.get("snap_apply_pending"):
+            if "snap_qty_pending" in state:
+                state.snap_qty = state.snap_qty_pending
+                del state["snap_qty_pending"]
+            if "snap_price_pending" in state:
+                state.snap_price = state.snap_price_pending
+                del state["snap_price_pending"]
+            if "snap_amount_pending" in state:
+                state.snap_amount_jpy = state.snap_amount_pending
+                del state["snap_amount_pending"]
+            state.snap_apply_pending = False
+
         with st.form("snap_form"):
             d = st.date_input("日付", value=sel_date, key="snap_date")
             ticker = (
@@ -324,9 +336,10 @@ def main():
             submitted = st.form_submit_button("追加/更新")
 
             if reset_vals:
-                state.snap_qty = 0.0
-                state.snap_price = 0.0
-                state.snap_amount_jpy = 0.0
+                state.snap_qty_pending = 0.0
+                state.snap_price_pending = 0.0
+                state.snap_amount_pending = 0.0
+                state.snap_apply_pending = True
                 st.rerun()
 
             if load_prev:
@@ -334,12 +347,13 @@ def main():
                 if tkr:
                     prev = get_prev_snapshot(conn, tkr, date_iso)
                     if prev:
-                        state.snap_qty = float(prev["qty"])
-                        state.snap_price = float(prev["price_ccy"])
+                        state.snap_qty_pending = float(prev["qty"])
+                        state.snap_price_pending = float(prev["price_ccy"])
                         prev_meta = asset_meta.get(tkr)
                         prev_ccy = prev_meta.get("ccy") if prev_meta else "JPY"
                         prev_fx = get_fx_rate(conn, prev_ccy, prev["date"]) or (1.0 if prev_ccy == "JPY" else 0.0)
-                        state.snap_amount_jpy = float(prev["qty"]) * float(prev["price_ccy"]) * (prev_fx or 0.0)
+                        state.snap_amount_pending = float(prev["qty"]) * float(prev["price_ccy"]) * (prev_fx or 0.0)
+                        state.snap_apply_pending = True
                         st.success(f"前回 {prev['date']} から qty/price を読み込みました")
                         st.rerun()
                     else:
@@ -365,12 +379,14 @@ def main():
                             qty_to_store = float(qty)
                         if amount_jpy == 0 or fx_for_calc:
                             upsert_snapshot(conn, date_iso, tkr, float(qty_to_store), price_to_store)
-                            state.snap_qty = float(qty_to_store)
-                            state.snap_price = price_to_store
-                            state.snap_amount_jpy = float(amount_jpy)
+                            state.snap_qty_pending = float(qty_to_store)
+                            state.snap_price_pending = price_to_store
+                            state.snap_amount_pending = float(amount_jpy)
+                            state.snap_apply_pending = True
                             st.success(
                                 f"登録: {date_iso} {tkr} qty={qty_to_store:.4f} price={price_to_store:.4f}"
                             )
+                            st.rerun()
 
         st.caption(f"{sel_date_str} のSnapshots")
         st.dataframe(
