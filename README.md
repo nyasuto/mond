@@ -53,6 +53,14 @@ INSERT INTO fx_rates (date, pair, rate) VALUES ('2025-09-15','USDJPY',145.2);
 
 # 直近1年分（開始日と終了日を指定）
 ./scripts/fetch_fx.py 2023-09-18 2024-09-18 USD JPY --db money_diary.db
+銘柄価格の自動取得（例: VTI, SNP）:
+
+```
+# 2024年の株価を取得（SNPは S&P500 指数 = ^GSPC を参照）
+./scripts/fetch_prices.py 2024-01-01 2024-12-31 VTI SNP=^GSPC --db money_diary.db
+
+# 当日分のみ
+./scripts/fetch_prices.py 2025-09-18 VTI SNP=^GSPC --db money_diary.db
 ```
 
 
