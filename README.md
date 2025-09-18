@@ -75,6 +75,68 @@ Money Diary は、個人利用に特化した資産・収支トラッキング�
    ./scripts/test.sh
    ```
 
+## 便利ビュー
+
+- ポートフォリオ合計（円換算）
+  ```sql
+  SELECT *
+    FROM v_portfolio_total
+   ORDER BY date DESC
+   LIMIT 5;
+  ```
+- 通貨別エクスポージャ
+  ```sql
+  SELECT *
+    FROM v_currency_exposure
+   WHERE date = 'YYYY-MM-DD'
+   ORDER BY ccy;
+  ```
+- 銘柄別ウェイト付き評価額
+  ```sql
+  SELECT date, ticker, value_jpy, portfolio_value_jpy, round(weight, 4) AS weight
+    FROM v_valuation_enriched
+   WHERE date = 'YYYY-MM-DD'
+   ORDER BY value_jpy DESC;
+  ```
+
+## ER 図
+
+主要テーブルの関係は以下のとおりです（`docs/er.mermaid` と同期）。
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+erDiagram
+    assets {
+        TEXT ticker PK "銘柄コード"
+        TEXT ccy "通貨 (ISO 3-letter)"
+        TEXT name "名称 (任意)"
+    }
+    fx_rates {
+        TEXT date PK "日付"
+        TEXT pair PK "通貨ペア (例: USDJPY)"
+        REAL rate "終値レート"
+    }
+    snapshots {
+        TEXT date PK "日付"
+        TEXT ticker PK "銘柄"
+        REAL qty "数量"
+        REAL price_ccy "現地通貨価格"
+    }
+    cashflows {
+        INTEGER id PK "ID"
+        TEXT date "日付"
+        TEXT ticker "銘柄"
+        TEXT type "種類 (DIVIDEND 等)"
+        REAL amount_ccy "金額"
+        TEXT ccy "通貨"
+    }
+
+    assets ||--o{ snapshots : "PK→FK"
+    assets ||--o{ cashflows : "PK→FK"
+    fx_rates ||..o{ snapshots : "日付+通貨で参照"
+    fx_rates ||..o{ cashflows : "日付+通貨で換算"
+```
+
 ### 手動入力スクリプト
 - `scripts/add_asset.sh` : 銘柄の追加 / 更新
 - `scripts/add_fx_manual.sh` : 指定日の FX レートを手入力
