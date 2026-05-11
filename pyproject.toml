@@ -7,6 +7,6 @@ dependencies = [
   "streamlit>=1.56.0",
   "pandas>=3.0.2",
   "ruff>=0.15.12",
-  "openai>=2.32.0",
+  "openai>=2.36.0",
   "python-dotenv>=1.2.2",
 ]
