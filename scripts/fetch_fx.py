@@ -5,20 +5,21 @@ import datetime as dt
 import json
 import sqlite3
 import sys
-import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from typing import Dict
+
+# Day boundaries follow Tokyo, since that is where these series are used.
+JST = dt.timezone(dt.timedelta(hours=9))
 
 BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&period1={start}&period2={end}"
 
 
 def to_epoch(d: dt.date) -> int:
-    return int(time.mktime(dt.datetime(d.year, d.month, d.day, 0, 0).timetuple()))
+    return int(dt.datetime(d.year, d.month, d.day, tzinfo=JST).timestamp())
 
 
-def fetch_history(symbol: str, start: dt.date, end: dt.date) -> Dict[str, float]:
+def fetch_history(symbol: str, start: dt.date, end: dt.date) -> dict[str, float]:
     url = BASE_URL.format(symbol=symbol, start=to_epoch(start), end=to_epoch(end + dt.timedelta(days=1)))
     req = urllib.request.Request(url, headers={"User-Agent": "MoneyDiaryFXFetcher/1.0"})
     try:
@@ -39,11 +40,11 @@ def fetch_history(symbol: str, start: dt.date, end: dt.date) -> Dict[str, float]
         raise RuntimeError(f"Missing time series for {symbol}")
 
     closes = quotes[0].get("close") or []
-    rates: Dict[str, float] = {}
+    rates: dict[str, float] = {}
     for ts, close in zip(timestamps, closes):
         if close is None:
             continue
-        date = dt.datetime.utcfromtimestamp(ts).date().isoformat()
+        date = dt.datetime.fromtimestamp(ts, tz=dt.UTC).date().isoformat()
         rates[date] = float(close)
     return rates
 
@@ -73,7 +74,7 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
 
-    today = dt.date.today()
+    today = dt.datetime.now(JST).date()
     if args.start is None:
         start = today
     else:
@@ -90,7 +91,7 @@ def main():
     base = args.base.upper()
     targets = [s.upper() for s in args.symbols]
 
-    all_rates: Dict[str, Dict[str, float]] = defaultdict(dict)
+    all_rates: dict[str, dict[str, float]] = defaultdict(dict)
     for target in targets:
         symbol = f"{base}{target}=X"
         try:

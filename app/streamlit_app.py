@@ -1,12 +1,18 @@
 import json
 import os
 import sqlite3
-from datetime import date as date_cls, datetime, timedelta
+from datetime import date as date_cls
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
+
+# The app is used from Japan, so "today" means the Tokyo day, not the day of
+# whatever machine happens to be running Streamlit.
+JST = ZoneInfo("Asia/Tokyo")
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_DEFAULT = ROOT / "money_diary.db"
@@ -18,7 +24,7 @@ load_dotenv(env_path)
 
 try:
     from openai import OpenAI
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     OpenAI = None
 
 
@@ -172,8 +178,8 @@ def get_portfolio_date_range(conn: sqlite3.Connection) -> tuple[date_cls | None,
     if not min_date or not max_date:
         return (None, None)
     return (
-        datetime.strptime(min_date, "%Y-%m-%d").date(),
-        datetime.strptime(max_date, "%Y-%m-%d").date(),
+        date_cls.fromisoformat(min_date),
+        date_cls.fromisoformat(max_date),
     )
 
 
@@ -329,7 +335,7 @@ def summarize_with_openai(prompt: str) -> str:
             input=prompt,
         )
     except Exception as exc:  # pragma: no cover
-        raise RuntimeError(f"OpenAI API 呼び出しに失敗しました: {exc}")
+        raise RuntimeError(f"OpenAI API 呼び出しに失敗しました: {exc}") from exc
 
     text = getattr(response, "output_text", "")
     if text:
@@ -418,7 +424,7 @@ def main():
     db_path = Path(db_path_str).expanduser().resolve()
     conn = get_conn(db_path)
 
-    sel_date = st.sidebar.date_input("対象日付", value=date_cls.today())
+    sel_date = st.sidebar.date_input("対象日付", value=datetime.now(JST).date())
     sel_date_str = sel_date.strftime("%Y-%m-%d")
 
     tabs = st.tabs(["Assets", "FX", "Snapshots", "Views", "Charts"])
@@ -508,7 +514,7 @@ def main():
             with info_cols[2]:
                 st.metric("FXレート", f"{fx_auto:.4f}" if fx_auto else ("1" if ccy == "JPY" else "-"))
 
-            colp1, colp2, colp3 = st.columns([1, 1, 2])
+            colp1, colp2, _ = st.columns([1, 1, 2])
             with colp1:
                 load_prev = st.form_submit_button("前回値を読み込む")
             with colp2:
@@ -854,7 +860,7 @@ def main():
         date_range = st.date_input(
             "期間",
             value=(default_start, default_end),
-            max_value=date_cls.today(),
+            max_value=datetime.now(JST).date(),
         )
         if isinstance(date_range, tuple):
             start_date, end_date = date_range
