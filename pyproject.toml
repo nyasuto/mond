@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "streamlit>=1.64.0",
   "pandas>=3.0.6",
-  "ruff>=0.16.7",
+  "ruff>=0.16.8",
   "openai>=3.15.0",
   "python-dotenv>=1.2.3",
 ]
