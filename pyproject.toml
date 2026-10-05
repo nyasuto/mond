@@ -8,5 +8,5 @@ dependencies = [
   "pandas>=3.0.6",
   "ruff>=0.16.9",
   "openai>=3.23.0",
-  "python-dotenv>=1.2.3",
+  "python-dotenv>=1.2.4",
 ]
